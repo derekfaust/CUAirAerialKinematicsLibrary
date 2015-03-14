@@ -2,6 +2,7 @@
 .DS_Store
 
 # LaTeX Files to ignore
+*.pdf 
 *.aux
 *.glo
 *.idx
