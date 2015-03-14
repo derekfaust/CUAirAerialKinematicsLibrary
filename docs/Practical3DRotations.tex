@@ -1,0 +1,332 @@
+\documentclass[letterpaper,10pt]{article}
+
+\usepackage{fullpage}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{listings}
+\usepackage{todonotes}
+\usepackage{hyperref}
+
+\newcommand\leftidx[3]{%
+  {\vphantom{#2}}#1#2#3%
+}
+
+\lstset{
+  basicstyle=\footnotesize,
+  breakatwhitespace=false,        % sets if automatic breaks should only happen at whitespace
+  breaklines=true,                 	% sets automatic line breaking
+  numbers=left,
+  numbersep = 5pt
+}
+
+\setcounter{tocdepth}{2}
+
+\title{Practical Three-Dimensional Rotations}
+\author{Derek Faust}
+
+\begin{document}
+\maketitle
+\begin{abstract}
+In this document, we explore various representations of three-dimensional rotations, conversions among them, and combinations of them. We then explore how to apply quaternions to solving a real problem: determining what angles to set motors to such that an aircraft-mounted camera points at a desired location.
+\end{abstract}
+
+\tableofcontents
+
+\newpage
+\section{Representing Rotations}
+Rotations are a way of describing the three angular degrees of freedom of a rigid object. Similar to the other three degrees of freedom---position---rotations can be thought of as a movement from a previous position, a definitive orientation, or a relative orientation. For the sake of this paper, we will use `rotation' and `orientation' interchangeably, though there may be circumstances where you want to make a distinction.
+
+Also like the position of an object, the orientation of an object must be described relative to some reference frame. By default, we prefer to use the fixed, global frame, but when composing (combining) rotations, it is often helpful to use the body coordinate frame that is intrinsic to the object rather than the extrinsic fixed frame. This is because with physical mechanisms, typically moving one axis changes the axis that another actuator moves about.
+
+\subsection{\href{http://en.wikipedia.org/wiki/Euler_angles}{Euler Angles}}
+Loosely defined, Euler angles are sets of three angles which represent a certain rotation. In addition to the angles, it is important to specify order, axes, and frame for the angles. If the three angles---representing three different rotations---are applied in the wrong order, around the wrong axis, or in the wrong frame, a different rotation will generally result. There are a multitude of different combinations of Euler angles, explored in slightly more depth in Appendix~\ref{sec:RotMatComp}, however there are a few sets that are more standard. For example, in gimbals it is common to use $zxz$. This means rotations about the the body's z-axis, then about it's x-axis, then about it's z-axis again---which will be different from the first rotation as long the rotation about the x-axis is non-zero. However, in aircraft, $zyx$ is used to represent first yaw around the z-axis (downward), then pitch about the y-axis (rightward), then roll about the x-axis (forwards). If you tried to represent the aircrafts rotation with $zxz$ Euler angles, your results would differ and cause a lot of confusion; it is very important to choose the Euler angles that best describe your configuration.
+
+In addition to potentially being ambiguous, it is difficult to combine rotations represented by Euler angles without converting to another representation. Further, Euler angles suffer from the phenomenon of gimbal lock, which stems from the way Euler angles map to the rotation space: in some cases the magnitude of the Euler angles will be very large despite the actual movement being relatively small. The primary benefit of Euler angles is that they are intuitive since they are derived from a series of distinct, physical rotations.
+
+\paragraph{\href{http://en.wikipedia.org/wiki/Axis?angle_representation}{Axis-Angle}}
+Axis-Angle representation stems from the theorem that any three-dimensional can be represented by a single rotation about one axis. This is intuitively simple when that rotation is about one of the coordinate axes, but in practice the angles and axes are not so nice and can be difficult to understand intuitively. However, the axis-angle representation or rotations eliminates the order and axis ambiguity of Euler angles since it only specifies one rotation about one axis. Still, the axis-angle representation does not lend itself to combination with other rotations without first converting to another representation.
+
+I will define the next following rotation representations using the axis-angle formulation because of clarity and physical basis. Also, when creating other representations in examples, we will combine multiple axis-angle representations because they are very explicit.
+
+\subsection{\href{http://en.wikipedia.org/wiki/Rotation_matrix}{Rotation Matrices}}
+Rotation matrices are one of the most common representations of three-dimensional rotations because they solve many of the problems associated with the representations above. Firstly, rotations represented by matrices can easily be combined by standard matrix multiplication. They can also be reversed by inverting the matrix, which is the same as the transpose for a rotation matrix. Lastly, they can also operate on vectors in space: to rotate a vector by a rotation matrix, simply left-multiply the column vector by the rotation matrix. One downside of rotation matrices is that they do not represent rotations intuitively. It is nearly impossible to glean what the rotation does from it's matrix alone. The other downside is that they use nine numbers to represent three degrees of freedom. As a result the matrix must be restricted to a certain form, which often degrades with computation. Additionally, computations may take longer than alternative methods because there are nine elements, as opposed to the quaternion's four.
+
+\begin{equation}
+R = \left[\begin{array}{c c c} \cos \theta +a_x^2 \left(1-\cos \theta\right) & a_x a_y \left(1-\cos \theta\right) - a_z \sin \theta & a_x a_z \left(1-\cos \theta\right) + a_y \sin \theta \\
+a_y a_x \left(1-\cos \theta\right) + a_z \sin \theta & \cos \theta + a_y^2\left(1-\cos \theta\right) & a_y a_z \left(1-\cos \theta\right) - a_x \sin \theta \\
+a_z a_x \left(1-\cos \theta\right) - a_y \sin \theta & a_z a_y \left(1-\cos \theta\right) + a_x \sin \theta & \cos \theta + a_z^2\left(1-\cos \theta\right) 
+\end{array}\right]
+\end{equation}
+
+\subsection{Quaternions}
+Quaternions are similar to rotation matrices in that they can represent any arbitrary rotation without singularities and can be easily combined or used as an operator. However they have the advantage of being less redundant than rotation matrices, and thus may reduce computation time. (The reduced computation time is typically only relevant on a restricted processor like a microcontroller).
+
+An important distinction is that quaternions are \emph{not} a 4-vector and thus do not obey the rules of linear algebra (however, it is often convenient to write them as a list of numbers). Quaternions are an extension of complex numbers---utilizing $\hat{\jmath}$ and $\hat{k}$ in addition to the usual imaginary number $\hat{\imath}$. These are the same complex numbers that we use for position in three-dimensional space, but the extra real number prevents us from using linear algebra.
+\begin{gather}
+q = q_w + q_x \hat{\imath} + q_y \hat{\jmath} + q_z \hat{k} \\
+q = \left(\begin{array}{c}q_w \\ q_x \\ q_y \\ q_z\end{array}\right)
+\end{gather}
+There are special rules for multiplying these complex numbers---particularly that operations are not commutative---which are well documented in many different sources across the internet. When using quaternions in the context of rotations, we will primarily use multiplication---for combining rotations---and conjugation---for reversing rotations. Proceed with caution if you think you need to perform another operation with a quaternion. \emph{In practice, I recommend writing functions to multiply, conjugate, and normalize quaternions, test them thoroughly, then leave them alone.}
+
+To give some sense of what the different components of a quaternion mean, I present the conversion from the axis-angle representation. In some sense, the real part represents the magnitude of the change, and the other components represent how much of the change occurs about that axis.
+\begin{equation}
+q = \left(\arraycolsep=1.4pt\def\arraystretch{2.2}\begin{array}{c} \cos\!\left(\dfrac{\theta}{2}\right) \\  a_x \sin\!\left(\dfrac{\theta}{2}\right) \\ a_y \sin\!\left(\dfrac{\theta}{2}\right) \\ a_z \sin\!\left(\dfrac{\theta}{2}\right) \end{array}\right)
+\end{equation}
+The primary problem with quaternions is that they are very unintuitive. Nevertheless, I will try to give a brief explanation. In the two-dimensional aircraft a rotation, $\theta$, can be represented by a complex number such that $c = \cos\!\left(\theta\right) + \hat{\imath} \sin\!\left(\theta\right)$. Quaternions are the generalization of this concept into three dimensions---and thus three different angles. 
+
+\subsection{Converting Between Representations}
+
+\paragraph{Quaternion to Rotation Matrix}
+\begin{equation}
+\label{eq:QtoMat}
+R(q) = \left[ \begin{array}{c c c} q_w^2+q_x^2-q_y^2-q_z^2 & 2(q_x q_y - q_w q_z) & 2(q_x q_z + q_w q_y) \\ 2(q_x q_y+q_w q_z) & q_w^2+q_y^2-q_x^2-q_z^2 & 2(q_y q_z - q_w q_x) \\ 2(q_x q_z - q_w q_y) & 2(q_y q_z + q_w q_x) & q_w^2+q_z^2-q_x^2-q_y^2 \end{array} \right] \\
+\end{equation}
+
+\paragraph{Determining Euler Angles}
+\label{sec:DetEulerAngles}
+Typically, after performing mathematical operations with rotation matrices or quaternions, one will want to convert that to rotations about a set of actuator axes. It can be tempting to use formulas found in a book or online, but they may not be correct for the problem at hand. The correct Euler angles are heavily dependent on the order of rotations and the frame in which they are performed. To ensure that one finds the correct set of Euler angles, I recommend composing your rotations with rotation matrices and finding the resultant matrix symbolically. From there, one can take the correct inverse trigonometric functions---preferably \texttt{atan2}, as it returns angles around the entire circle---to determine the Euler angles.
+
+For simplicity, I have included Appendix~\ref{sec:RotMatComp}, which includes symbolic matrix representations of all valid combinations or Euler angles. Quaternions are more compact than rotation matrices, and thus can be harder to extract Euler angles from directly. The most straight-forward way of doing so is to determine the angles in terms of matrix elements, then compute those specific matrix elements from the quaternion using Equation~\ref{eq:QtoMat}. In Section~\ref{sec:MotorAngles}, we go through this process for a specific example, CUAir's 2015 camera gimbal. 
+
+\section{Applying Rotations}
+Before we begin mixing various rotations together, it if helpful to define a notation to keep things clear. The symbol $q$ will be used to represent quaternions, and $R$ will be used represent rotation matrices. We will put a script letter to the upper left which will specify the frame in which the rotation is defined, and we will use a subscript to the right which defines:
+\begin{align}
+\leftidx{\mathcal{^F}}{q}{_1} & \; \text{is the quaternion representing rotation 1 in the fixed frame} \\
+\leftidx{\mathcal{^B}}{q}{_2} & \; \text{is the quaternion representing rotation 2 in the body frame} \\
+\leftidx{\mathcal{^P}}{R}{_2} & \; \text{is the rotation matrix representing rotation 2 in the aircraft's frame}
+\end{align}
+
+\subsection{Combining Rotations}
+With matrices and quaternions, rotations can be combined either in the fixed frame (before other rotations) or the body's frame (after other rotations).
+
+If the rotations are to be performed consecutively (such as in a gimbal, where the axis one motor spins about changes as a different motor rotates) then each consecutive matrix should be right-multiplied onto the set.
+\begin{gather}
+\leftidx{^\mathcal{F}}{R}{_{1,2,3}} = \left(\leftidx{^\mathcal{B}}{R}{_1}\right) \left(\leftidx{^\mathcal{B}}{R}{_2}\right) \left(\leftidx{^\mathcal{B}}{R}{_3}\right) \\
+\leftidx{^\mathcal{F}}{q}{_{1,2,3}} = \left(\leftidx{^\mathcal{B}}{q}{_1}\right) \left(\leftidx{^\mathcal{B}}{q}{_2}\right) \left(\leftidx{^\mathcal{B}}{q}{_3} \right)
+\end{gather}
+ As long as body-frame rotations are right-multiplied not the set, the frame of the resultant rotation---the fixed frame in this case---does not change. Later on, when we talk about changing coordinate frames, it made be useful to look back at this as:
+\begin{gather}
+\leftidx{^\mathcal{F}}{R}{_{1,2,3}} = \left(\leftidx{^\mathcal{F}}{R}{_\mathcal{B}}\right) \left(\leftidx{^\mathcal{B}}{R}{_1}\right) \left(\leftidx{^\mathcal{B}}{R}{_2}\right) \left(\leftidx{^\mathcal{B}}{R}{_3}\right) \\
+\leftidx{^\mathcal{F}}{q}{_{1,2,3}} = \left(\leftidx{^\mathcal{F}}{q}{_\mathcal{B}}\right) \left(\leftidx{^\mathcal{B}}{q}{_1}\right) \left(\leftidx{^\mathcal{B}}{q}{_2}\right) \left(\leftidx{^\mathcal{B}}{q}{_3}\right)
+\end{gather}
+where $\leftidx{^\mathcal{F}}{R}{_\mathcal{B}}$ and $\leftidx{^\mathcal{F}}{q}{_\mathcal{B}}$ represent zero rotation because initially the body's axis are assumed to be aligned with the fixed frame axes.
+
+If all three rotations are to be performed relative to the fixed frame (such that any one rotation axis is unmodified by the rotation of any other axis) then each matrix should be left-multiplied onto the set. For example.
+\begin{gather}
+\leftidx{^\mathcal{F}}{R}{_{1,2,3}} = \leftidx{^\mathcal{F}}{R}{_3} \leftidx{^\mathcal{F}}{R}{_2} \leftidx{^\mathcal{F}}{R}{_1} \\
+\leftidx{^\mathcal{F}}{q}{_{1,2,3}} = \leftidx{^\mathcal{F}}{q}{_3} \leftidx{^\mathcal{F}}{q}{_2} \leftidx{^\mathcal{F}}{q}{_1}
+\end{gather}
+
+The way that the rotations are combined depends on how each rotation matrix is defined (with respect to what axes) and is not something that can be arbitrarily decided after the rotation matrix is formed. Generally, the multiplication (combination) of rotations is not commutative---the order is important.
+
+
+\subsection{Changing Coordinate Frames}
+Often we would like to describe to orientation of one object with respect to another object. Essentially, we want to change the frame that the orientation is referenced from. To do this, we combine it with a rotation that describes the two frames.
+\begin{align}
+\leftidx{^\mathcal{B}}{q}{_{1}} &= \left(\leftidx{^\mathcal{F}}{q}{_\mathcal{B}}\right)^{-1} \left(\leftidx{^\mathcal{F}}{q}{_{1}}\right) \\
+\leftidx{^\mathcal{B}}{q}{_{1}} &= \left(\leftidx{^\mathcal{F}}{q}{_\mathcal{B}}\right)^* \left(\leftidx{^\mathcal{F}}{q}{_{1}}\right) \\
+\leftidx{^\mathcal{B}}{q}{_{1}} &= \left(\leftidx{^\mathcal{B}}{q}{_\mathcal{F}}\right) \left(\leftidx{^\mathcal{F}}{q}{_{1}}\right) \\
+\nonumber& \\
+\leftidx{^\mathcal{B}}{R}{_{1}} &= \left(\leftidx{^\mathcal{F}}{R}{_\mathcal{B}}\right)^{-1} \left(\leftidx{^\mathcal{F}}{R}{_{1}}\right) \\
+\leftidx{^\mathcal{B}}{R}{_{1}} &= \left(\leftidx{^\mathcal{F}}{R}{_\mathcal{B}}\right)^\mathrm{T} \left(\leftidx{^\mathcal{F}}{R}{_{1}}\right) \\
+\leftidx{^\mathcal{B}}{R}{_{1}} &= \left(\leftidx{^\mathcal{B}}{R}{_\mathcal{F}}\right) \left(\leftidx{^\mathcal{F}}{R}{_{1}}\right) 
+\end{align}
+Using this notation, we see that the interior subscripts can cancel with the interior superscripts, to yield a rotation with the proper notation. We also see that taking the inverse of a rotation---represented by the transverse of a rotation matrix and the conjugate of a quaternion---just swaps its sub- and super-scripts.
+
+%\subsection{Changing Rotation Basis}
+%The majority of the time, we will want to multiply rotation representations together to either add rotations in the same frame, or convert an orientation to a different frame. Here we make a distinction between rotation and orientation---only for explanation sake. We define orientation as the rotation with respect to the current frame, while rotation is relative to our current position. Sometimes it is useful to represent a rotation in a different coordinate frame---essentially preserving the rotation (angle-six, Euler angles) in some fixed frame, but changing it's basis.
+%Then changing the basis of that rotation (preserving the rotation, but changing the axes) via a similarity transformation
+%\todo[inline]{Understand and explain similarity transforms}
+%\begin{align}
+%\leftidx{^\mathcal{B}}{q}{_{1}} &= \left(\leftidx{^\mathcal{F}}{q}{_\mathcal{B}}\right)^{-1} \left(\leftidx{^\mathcal{F}}{q}{_{1}}\right)
+%\end{align}
+%\begin{equation*}
+%\leftidx{^\mathcal{A}}{R}{_{C,C \text{to} C,D}} = \left(\leftidx{^\mathcal{A}}{R}{_{C}}\right) \left( \leftidx{^\mathcal{C}}{R}{_\text{Target}} \right)  \left(\leftidx{^\mathcal{A}}{R}{_{C}}\right)^{-1}
+%\end{equation*}
+
+%\subsection{Applying rotation to a vector}
+
+
+\section{Example: Pointing a Camera Gimbal}
+Here we explore the application of the concepts discussed above to a real problem---determining how to actuate a two-axis gimbal to point a camera at a certain GPS coordinate.
+
+\subsection{Determining Pointing Quaternion}
+The first part of this task is to determine an orientation of the camera---in the global frame, $\mathcal{F}$---such that it points toward the target GPS coordinate. If the desired orientation of the camera is simply straight-down, then a quaternion representing a $90^\circ$ rotation about the global y-axis---$\leftidx{^\mathcal{F}}{q}{_{D}} = 0 + 0\hat{\imath} + 1 \hat{\jmath} + 0 \hat{k}$---will suffice.
+
+\subsubsection{Determining Relative Position of the Target}
+To simplify the math, we will employ a North-East-Down coordinate frame located at the position of the aircraft. This reduces complication because all distances will be relative to the aircraft, yet all angles and rotations will be in the global frame (since this frame and the global frame have the same orientation).
+\begin{align}
+\Delta\mathrm{La} &= \mathrm{La}_\text{Target} - \mathrm{La}_\text{Aircraft} \\
+\Delta\mathrm{Lo} &= \mathrm{Lo}_\text{Target} - \mathrm{Lo}_\text{Aircraft} \\
+h_\text{AGL} &= h_\text{Aircraft} - h_\text{Ground} \\
+a &= \Delta\mathrm{La} \left(\dfrac{\pi}{180}\right) r_\text{Earth} \\
+b &= \Delta\mathrm{Lo} \left(\dfrac{\pi}{180}\right) \left(1-\cos\!\theta\right) r_\text{Earth}
+\end{align}
+
+\subsubsection{Form the Quaternion}
+Given the relative position for us to point, we can form the quaternion that points the camera in this direction. It is important to note that in general there is an extra degree of freedom that is not defined by our pointing vector: the rotation about the camera's line-of-sight. In creating this target quaternion, we will ignore this angle (leaving it to be whatever is mathematically simplest), and when we eventually convert this to motor angles, we will ignore that angle since we cannot actuate it anyway.
+
+In this case, the simplest way to determine a quaternion pointing at the target is to find the axis along which the camera's line-of-sight moves directly toward the target. To do this, we select an axis perpendicular to this straight-line trajectory, then determine the angle or rotation from the tangent.
+\begin{equation*}
+\text{axis} = \left[\begin{array}{c} -b \\ a \\ 0 \end{array}\right] \quad \theta = \mathrm{atan2}\!\left(\sqrt{a^2+b^2}, \,h\right)
+\end{equation*}
+
+Using the axis-angle formulation, we can compose a quaternion that represents this rotation.
+\begin{gather}
+\leftidx{^\mathcal{F}}{q}{_{D}} = \dfrac{1}{n} \left[\arraycolsep=1.4pt\def\arraystretch{2.2}\begin{array}{c} \cos\!\left(\dfrac{\mathrm{atan2}\!\left(d,h\right)}{2}\right) \\ -b \sin\!\left(\dfrac{\mathrm{atan2}\!\left(d,h\right)}{2}\right) \\ a \sin\!\left(\dfrac{\mathrm{atan2}\!\left(d,h\right)}{2}\right) \\ 0\end{array} \right] = \left[\arraycolsep=1.4pt\def\arraystretch{2.2}\begin{array}{c} \dfrac{c}{n} \\ -\dfrac{bs}{n} \\ \dfrac{as}{n} \\ 0 \end{array}\right] \\ 
+\nonumber c= \cos\!\left(\dfrac{\theta}{2}\right) = \pm \sqrt{\dfrac{1+\cos\!\left(\theta \right)}{2}}, \quad s=\sin\!\left(\dfrac{\theta}{2}\right) = \pm \sqrt{\dfrac{1-\cos\!\left(\theta\right)}{2}}\\
+\nonumber m = \sqrt{a^2 + b^2 + h^2}, \quad n = \sqrt{c^2+b^2s^2+a^2s^2}
+\end{gather}
+An important thing to note is that we divide by $n$, the quaternion's magnitude, to normalize the quaternion before proceeding. We do this so that when we perform operations with other quaternions, they all remain of unit length and do not distort each other.
+
+Also, because we often want to perform calculations like this on a microcontroller, we may want to convert some of the trigonometric calls---particularly find the inverse trigonometric function of another trigonometric functions---to simpler algebraic operations.
+\begin{gather*}
+\cos\!\left(\theta\right) = \dfrac{h}{\sqrt{d^2+h^2}} = \dfrac{h}{\sqrt{a^2+b^2+h^2}} \\
+\cos\!\left(\theta\right) = \cos^2\!\left(\dfrac{\theta}{2}\right) - \sin^2\!\left(\dfrac{\theta}{2}\right)  = 1 - 2\sin^2\!\left(\dfrac{\theta}{2}\right) = 1\cos^2\!\left(\dfrac{\theta}{2}\right) - 1\\
+\sin\!\left(\dfrac{\theta}{2}\right) = \pm \sqrt{\dfrac{1-\cos\!\left(\theta\right)}{2}}, \quad \cos\!\left(\dfrac{\theta}{2}\right) = \pm \sqrt{\dfrac{1+\cos\!\left(\theta \right)}{2}}
+\end{gather*}
+
+\subsection{Finding Orientations Relative to the Aircraft}
+In the previous step, we have determined the desired camera quaternion in the fixed frame. From the Inertial Measurement Units on the aircraft and on the camera, we can also assume to have quaternions representing the aircraft's and camera's current orientations relative to the fixed frame.
+\begin{gather*}
+\leftidx{^\mathcal{F}}{q}{_\text{Aircraft}} \quad \text{and} \quad \leftidx{^\mathcal{F}}{q}{_\text{Camera}} \quad \text{and} \quad \leftidx{^\mathcal{F}}{q}{_\text{Desired}}
+\end{gather*}
+
+The actuators of the gimbal are fixed to the frame of the aircraft, so the current orientation of the camera and the desired orientation of the camera must be represented in this frame. To convert from the fixed frame to the aircraft's frame, we must perform the opposite of the rotation that would move the fixed frame to the aircraft's frame:
+\begin{gather}
+\left(\leftidx{^\mathcal{A}}{q}{_{C}}\right) = \left(\leftidx{^\mathcal{F}}{q}{_P}\right)^{-1} \left(\leftidx{^\mathcal{F}}{q}{_{C}}\right) = \left(\leftidx{^\mathcal{F}}{q}{_P}\right)^* \left(\leftidx{^\mathcal{F}}{q}{_{C}}\right) \\
+\left(\leftidx{^\mathcal{A}}{q}{_{D}}\right) = \left(\leftidx{^\mathcal{F}}{q}{_P}\right)^{-1} \left(\leftidx{^\mathcal{F}}{q}{_{D}}\right) = \left(\leftidx{^\mathcal{F}}{q}{_P}\right)^* \left(\leftidx{^\mathcal{F}}{q}{_{D}}\right)
+\end{gather}
+In the equations above, I use $\left(\cdot\right)^{-1}$ to indicate the inverse of the rotation represented by a quaternion, but mathematically the inverse of the rotation is just the conjugation of the quaternion. Rotation matrices would be combined as the quaternions above except that the inverse of a rotation matrix is truly the matrix inverse, which is the same as the matrix transposed for rotation matrices. 
+
+\subsection{Converting to Motor Angles}
+\label{sec:MotorAngles}
+Once these rotations are in the aircraft's frame, we can find the the motor angles that correspond to this rotation. There is also an additional angle, spin, so that any orientation is achievable---but in practice, the spin will be ignored because we don't care about rotation about the camera's axis. To convert a quaternion to this parameterization, we employ the process outlined in Section~\ref{sec:DetEulerAngles}. This starts by using symbolic math to multiply the three matrices representing each successive rotation resulting in a total rotation matrix. This matrix will show how each Euler angle maps to an $\leftidx{^\mathcal{A}}{R}$. In the case of CUAir's 2015 Camera Gimbal:
+\begin{equation*}
+\leftidx{^\mathcal{A}}{R}{_{x,y,z}} = R_{x,\text{Roll}} R_{y,\text{Pitch}} R_{z,\text{Spin}} = \left[\begin{array}{c c c} c_\text{pitch} c_\text{spin} & -c_\text{pitch} s_\text{spin} & s_\text{pitch} \\ c_\text{roll} s_\text{spin} + c_\text{spin} s_\text{pitch} s_\text{roll} & c_\text{roll} c_\text{spin} - s_\text{pitch} s_\text{roll} s_\text{spin} & -c_\text{pitch} s_\text{roll} \\ s_\text{roll} s_\text{spin} - c_\text{spin} s_\text{pitch} c_\text{roll} & s_\text{roll} c_\text{spin} + s_\text{pitch} c_\text{roll} s_\text{spin} & c_\text{pitch} c_\text{roll} \end{array} \right]
+\end{equation*}
+
+By combining terms from this matrix, we can easily get the tangent of two of the angles, and the sine of the third. So long as $\cos\!\left(\theta_{y,\text{Pitch}}\right) \neq 0$, the Euler angles are simply:
+\begin{align*}
+\theta_y &= \mathrm{asin}\!\left(R_{1,3}\right) \\
+\theta_z &= \mathrm{atan2}\!\left(-R_{1,2}, \, R_{1,1}\right) \\
+\theta_x &= \mathrm{atan2}\!\left(-R_{2,3}, \, R_{3,3}\right)
+\end{align*}
+To find these terms of the rotation matrix, we employ Equation~\ref{eq:QtoMat} which will allow us to calculate the terms that we need to find the Euler angles.
+\begin{align}
+\theta_y &= \mathrm{asin}\!\left(R_{1,3}\right) = \mathrm{asin}\!\left(2\left(q_x q_z - q_w q_y\right)\right) \\
+\theta_z &= \mathrm{atan2}\!\left(-R_{1,2}, \, R_{1,1}\right) = \mathrm{atan2}\!\left(-2\left(q_x q_y - q_w q_z\right), \, q_w^2 +q_x^2 - q_y^2 - q_z^2\right) \\
+\theta_x &= \mathrm{atan2}\!\left(-R_{2,3}, \, R_{3,3}\right) = \mathrm{atan2}\!\left(-2\left(q_y q_z - q_w q_x\right), \, q_w^2 - q_x^2 - q_y^2 + q_z^2\right)
+\end{align}
+
+\paragraph{Special Cases}
+In the case where $\cos\!\left(\theta_{y,\text{Pitch}}\right) = 0$, we cannot use the method described above as both the sine and cosine our desired angles will be multiplied by zero. However, if $\cos\!\left(\theta_{y,\text{Pitch}}\right) = 0$, then $\sin\!\left(\theta_{y,\text{Pitch}}\right) = \pm1$ and our matrix simplifies greatly.
+\begin{align}
+\nonumber \text{For } & \sin\!\left(\theta_{y,\text{Pitch}}\right) = 1 \\
+R_{x,y,z} &= \left[\begin{array}{c c c} 0 & 0 & 1 \\ c_x s_z + c_z s_x & c_x c_z - s_x s_z & 0 \\ s_x s_z - c_x c_z & c_z s_x + c_x s_z & 0\end{array} \right] = \left[\begin{array}{c c c} 0 & 0 & 1 \\ \sin\!\left(\theta_x + \theta_z\right) & \cos\!\left(\theta_x + \theta_z\right) & 0 \\ -\cos\!\left(\theta_x + \theta_z\right) & \sin\!\left(\theta_x + \theta_z\right) & 0\end{array} \right] \\
+\theta_y &= \dfrac{\pi}{2} \\
+\theta_x &= 0 \\
+\theta_z &= \mathrm{atan2}\!\left(R_{2,1}, \, R_{2,2}\right) = \mathrm{atan2}\!\left(2\left(q_x q_y + q_w q_z\right), \, q_w^2 - q_x^2 + q_y^2 - q_z^2 \right)
+\end{align}
+
+\begin{align}
+\nonumber \text{For } & \sin\!\left(\theta_{y,\text{Pitch}}\right) = -1 \\
+R_{x,y,z} &= \left[\begin{array}{c c c} 0 & 0 & 1 \\ c_x s_z - c_z s_x & c_x c_z + s_x s_z & 0 \\ s_x s_z + c_x c_z & c_z s_x - c_x s_z & 0\end{array} \right] = \left[\begin{array}{c c c} 0 & 0 & 1 \\ \sin\!\left(\theta_z - \theta_x\right) & \cos\!\left(\theta_z - \theta_x\right) & 0\\ \cos\!\left(\theta_z - \theta_z\right) & -\sin\!\left(\theta_z - \theta_x\right) & 0\end{array} \right] \\
+\theta_y &= -\dfrac{\pi}{2} \\
+\theta_x &= 0 \\
+\theta_z &= \mathrm{atan2}\!\left(R_{2,1}, \, R_{2,2}\right) = \mathrm{atan2}\!\left(2\left(q_x q_y + q_w q_z\right), \, q_w^2 - q_x^2 + q_y^2 - q_z^2 \right) \\
+\end{align}
+
+In both of the cases shown above, when $\cos\!\left(\theta_{y,\text{Pitch}}\right) = 0$, then the matrix shows that $\theta_{x,\text{Roll}}$ and $\theta_{z,\text{Spin}}$ effectively operate about the same axis. There are infinitely many solutions to this problem because only one variable is required to span the space. In this case, we can choose any arbitrary value for one of the angles, then calculate the value of the other that satisfies the constraints. For this particular situation, I chose $\theta_{x,\text{Roll}} = 0$ because we cannot actuate about the z-axis, so we never need to actually perform the more complex calculation.
+
+\paragraph{Moving the Motors}
+When controlling actuators, typically the error between the current and desired position is used. The process above shows how to convert both the desired quaternion and the current quaternion into motor angles. To develop a control signal for the motors, we will want to subtract the current motor angles from the desired motor angles, thus telling us how much the motors need to rotate.
+
+\subparagraph{Finding Difference Rotation \emph{before} Converting to Angles}
+It is tempting to just find the desired rotation of the camera relative to the camera's current orientation to avoid performing multiple inverse trigonometric functions. However, one cannot simply transform that rotation into changes in motor angles because one needs to consider the axes about which the motors are rotating. In the camera's current position, both motor's axes will be aligned with neither the aircraft's frame or the camera's frame. Rather, one will be aligned with an axis in one frame, and the other with an axis in a different frame. Converting among these frames would require far more computation, and be far more difficult to keep clear.
+
+%I have tried finding a difference transformation between the current camera orientation and the target orientation, and then converting that to motor angles, but haven't found any success. \\
+%I tried this my converting the target orientation to the current camera frame:
+%\begin{equation*}
+%\leftidx{^\mathcal{C}}{R}{_\text{Target}} = \left(\leftidx{^\mathcal{A}}{R}{_{C}}\right)^{-1} \left(\leftidx{^\mathcal{A}}{R}{_{D}}\right)
+%\end{equation*}
+%Then changing the basis of that rotation (preserving the rotation, but changing the axes) via a similarity transformation
+%\begin{equation*}
+%\leftidx{^\mathcal{A}}{R}{_{C,C \text{to} C,D}} = \left(\leftidx{^\mathcal{A}}{R}{_{C}}\right) \left( \leftidx{^\mathcal{C}}{R}{_\text{Target}} \right)  \left(\leftidx{^\mathcal{A}}{R}{_{C}}\right)^{-1}
+%\end{equation*}
+%After converting this to motor angles, this yields a difference result than simply calculating the difference in the desired and current motor angles (which is assured to be correct). This has something to do with moving the motors from their current position vs the zero position, as there error increases as the current angle of the camera get farther from zero.
+
+\clearpage
+\appendix
+\section{Rotation Matrices for All Compositions}
+\label{sec:RotMatComp}
+
+\subsection{Body Frame Rotation Compositions}
+Rotations represented in the body frame are rotations that depend on an axis intrinsic to the body. For example, with aircraft, first yaw is defined about the aircraft's x-axis (which is the same originally as the global z-axis), then pitch about the aircraft's y-axis (which is not the same as the global y-axis after the yaw rotation), then a roll about the aircraft's x-axis (which was modified through both of the previous rotations.
+\subsubsection{Tait--Bryan Angle Compositions}
+\begin{gather*}
+R_x R_y R_z =  \\
+\left[\begin{array}{ccc} \cos\!(\theta_y)\, \cos\!\left(z  \right) & - \cos\!(\theta_y)\, \sin\!\left(z  \right) & \sin\!(\theta_y)\\ \cos\!(\theta_x)\, \sin\!\left(z  \right) + \cos\!\left(z  \right)\, \sin\!(\theta_x)\, \sin\!(\theta_y) & \cos\!(\theta_x)\, \cos\!\left(z  \right) - \sin\!(\theta_x)\, \sin\!(\theta_y)\, \sin\!\left(z  \right) & - \cos\!(\theta_y)\, \sin\!(\theta_x)\\ \sin\!(\theta_x)\, \sin\!\left(z  \right) - \cos\!(\theta_x)\, \cos\!\left(z  \right)\, \sin\!(\theta_y) & \cos\!\left(z  \right)\, \sin\!(\theta_x) + \cos\!(\theta_x)\, \sin\!(\theta_y)\, \sin\!\left(z  \right) & \cos\!(\theta_x)\, \cos\!(\theta_y) \end{array}\right] \\
+\\
+R_x R_z R_y = \\
+\left[\begin{array}{ccc} \cos\!(\theta_y)\, \cos\!(\theta_z) & - \sin\!(\theta_z) & \cos\!(\theta_z)\, \sin\!(\theta_y)\\ \sin\!(\theta_x)\, \sin\!(\theta_y) + \cos\!(\theta_x)\, \cos\!(\theta_y)\, \sin\!(\theta_z) & \cos\!(\theta_x)\, \cos\!(\theta_z) & \cos\!(\theta_x)\, \sin\!(\theta_y)\, \sin\!(\theta_z) - \cos\!(\theta_y)\, \sin\!(\theta_x)\\ \cos\!(\theta_y)\, \sin\!(\theta_x)\, \sin\!(\theta_z) - \cos\!(\theta_x)\, \sin\!(\theta_y) & \cos\!(\theta_z)\, \sin\!(\theta_x) & \cos\!(\theta_x)\, \cos\!(\theta_y) + \sin\!(\theta_x)\, \sin\!(\theta_y)\, \sin\!(\theta_z) \end{array}\right] \\
+\\
+R_y R_z R_x = \\
+\left[\begin{array}{ccc} \cos\!(\theta_y)\, \cos\!(\theta_z) & \sin\!(\theta_x)\, \sin\!(\theta_y) - \cos\!(\theta_x)\, \cos\!(\theta_y)\, \sin\!(\theta_z) & \cos\!(\theta_x)\, \sin\!(\theta_y) + \cos\!(\theta_y)\, \sin\!(\theta_x)\, \sin\!(\theta_z)\\ \sin\!(\theta_z) & \cos\!(\theta_x)\, \cos\!(\theta_z) & - \cos\!(\theta_z)\, \sin\!(\theta_x)\\ - \cos\!(\theta_z)\, \sin\!(\theta_y) & \cos\!(\theta_y)\, \sin\!(\theta_x) + \cos\!(\theta_x)\, \sin\!(\theta_y)\, \sin\!(\theta_z) & \cos\!(\theta_x)\, \cos\!(\theta_y) - \sin\!(\theta_x)\, \sin\!(\theta_y)\, \sin\!(\theta_z) \end{array}\right] \\
+\\
+R_y R_x R_z = \\
+\left[\begin{array}{ccc} \cos\!(\theta_y)\, \cos\!(\theta_z) + \sin\!(\theta_x)\, \sin\!(\theta_y)\, \sin\!(\theta_z) & \cos\!(\theta_z)\, \sin\!(\theta_x)\, \sin\!(\theta_y) - \cos\!(\theta_y)\, \sin\!(\theta_z) & \cos\!(\theta_x)\, \sin\!(\theta_y)\\ \cos\!(\theta_x)\, \sin\!(\theta_z) & \cos\!(\theta_x)\, \cos\!(\theta_z) & - \sin\!(\theta_x)\\ \cos\!(\theta_y)\, \sin\!(\theta_x)\, \sin\!(\theta_z) - \cos\!(\theta_z)\, \sin\!(\theta_y) & \sin\!(\theta_y)\, \sin\!(\theta_z) + \cos\!(\theta_y)\, \cos\!(\theta_z)\, \sin\!(\theta_x) & \cos\!(\theta_x)\, \cos\!(\theta_y) \end{array}\right] \\
+\\
+R_z R_x R_y = \\
+\left[\begin{array}{ccc} \cos\!(\theta_y)\, \cos\!(\theta_z) - \sin\!(\theta_x)\, \sin\!(\theta_y)\, \sin\!(\theta_z) & - \cos\!(\theta_x)\, \sin\!(\theta_z) & \cos\!(\theta_z)\, \sin\!(\theta_y) + \cos\!(\theta_y)\, \sin\!(\theta_x)\, \sin\!(\theta_z)\\ \cos\!(\theta_y)\, \sin\!(\theta_z) + \cos\!(\theta_z)\, \sin\!(\theta_x)\, \sin\!(\theta_y) & \cos\!(\theta_x)\, \cos\!(\theta_z) & \sin\!(\theta_y)\, \sin\!(\theta_z) - \cos\!(\theta_y)\, \cos\!(\theta_z)\, \sin\!(\theta_x)\\ - \cos\!(\theta_x)\, \sin\!(\theta_y) & \sin\!(\theta_x) & \cos\!(\theta_x)\, \cos\!(\theta_y) \end{array}\right] \\
+\\
+R_z R_y R_x = \\
+\left[\begin{array}{ccc} \cos\!(\theta_y)\, \cos\!(\theta_z) & \cos\!(\theta_z)\, \sin\!(\theta_x)\, \sin\!(\theta_y) - \cos\!(\theta_x)\, \sin\!(\theta_z) & \sin\!(\theta_x)\, \sin\!(\theta_z) + \cos\!(\theta_x)\, \cos\!(\theta_z)\, \sin\!(\theta_y)\\ \cos\!(\theta_y)\, \sin\!(\theta_z) & \cos\!(\theta_x)\, \cos\!(\theta_z) + \sin\!(\theta_x)\, \sin\!(\theta_y)\, \sin\!(\theta_z) & \cos\!(\theta_x)\, \sin\!(\theta_y)\, \sin\!(\theta_z) - \cos\!(\theta_z)\, \sin\!(\theta_x)\\ - \sin\!(\theta_y) & \cos\!(\theta_y)\, \sin\!(\theta_x) & \cos\!(\theta_x)\, \cos\!(\theta_y) \end{array}\right] \\
+\end{gather*}
+
+\subsubsection{True Euler Angle Compositions}
+\begin{gather*}
+R_x R_y R_x = \\
+\left[\begin{array}{ccc} \cos\!(\theta_y) & \sin\!(\theta_{x,2})\, \sin\!(\theta_y) & \cos\!(\theta_{x,2})\, \sin\!(\theta_y)\\ \sin\!(\theta_x)\, \sin\!(\theta_y) & \cos\!(\theta_x)\, \cos\!(\theta_{x,2}) - \cos\!(\theta_y)\, \sin\!(\theta_x)\, \sin\!(\theta_{x,2}) &  - \cos\!(\theta_x)\, \sin\!(\theta_{x,2}) - \cos\!(\theta_{x,2})\, \cos\!(\theta_y)\, \sin\!(\theta_x)\\ - \cos\!(\theta_x)\, \sin\!(\theta_y) & \cos\!(\theta_{x,2})\, \sin\!(\theta_x) + \cos\!(\theta_x)\, \cos\!(\theta_y)\, \sin\!(\theta_{x,2}) & \cos\!(\theta_x)\, \cos\!(\theta_{x,2})\, \cos\!(\theta_y) - \sin\!(\theta_x)\, \sin\!(\theta_{x,2}) \end{array}\right]\\
+\\
+R_x R_z R_x = \\
+\left[\begin{array}{ccc} \cos\!(\theta_z) & - \cos\!(\theta_{x,2})\, \sin\!(\theta_z) & \sin\!(\theta_{x,2})\, \sin\!(\theta_z)\\ \cos\!(\theta_x)\, \sin\!(\theta_z) & \cos\!(\theta_x)\, \cos\!(\theta_{x,2})\, \cos\!(\theta_z) - \sin\!(\theta_x)\, \sin\!(\theta_{x,2}) &  - \cos\!(\theta_{x,2})\, \sin\!(\theta_x) - \cos\!(\theta_x)\, \cos\!(\theta_z)\, \sin\!(\theta_{x,2})\\ \sin\!(\theta_x)\, \sin\!(\theta_z) & \cos\!(\theta_x)\, \sin\!(\theta_{x,2}) + \cos\!(\theta_{x,2})\, \cos\!(\theta_z)\, \sin\!(\theta_x) & \cos\!(\theta_x)\, \cos\!(\theta_{x,2}) - \cos\!(\theta_z)\, \sin\!(\theta_x)\, \sin\!(\theta_{x,2}) \end{array}\right]\\
+\\
+R_y R_z R_y = \\
+\left[\begin{array}{ccc} \cos\!(\theta_y)\, \cos\!(\theta_{y,2})\, \cos\!(\theta_z) - \sin\!(\theta_y)\, \sin\!(\theta_{y,2}) & - \cos\!(\theta_y)\, \sin\!(\theta_z) & \cos\!(\theta_{y,2})\, \sin\!(\theta_y) + \cos\!(\theta_y)\, \cos\!(\theta_z)\, \sin\!(\theta_{y,2})\\ \cos\!(\theta_{y,2})\, \sin\!(\theta_z) & \cos\!(\theta_z) & \sin\!(\theta_{y,2})\, \sin\!(\theta_z)\\  - \cos\!(\theta_y)\, \sin\!(\theta_{y,2}) - \cos\!(\theta_{y,2})\, \cos\!(\theta_z)\, \sin\!(\theta_y) & \sin\!(\theta_y)\, \sin\!(\theta_z) & \cos\!(\theta_y)\, \cos\!(\theta_{y,2}) - \cos\!(\theta_z)\, \sin\!(\theta_y)\, \sin\!(\theta_{y,2}) \end{array}\right]\\
+\\
+R_y R_x R_y = \\
+\left[\begin{array}{ccc} \cos\!(\theta_y)\, \cos\!(\theta_{y,2}) - \cos\!(\theta_x)\, \sin\!(\theta_y)\, \sin\!(\theta_{y,2}) & \sin\!(\theta_x)\, \sin\!(\theta_y) & \cos\!(\theta_y)\, \sin\!(\theta_{y,2}) + \cos\!(\theta_x)\, \cos\!(\theta_{y,2})\, \sin\!(\theta_y)\\ \sin\!(\theta_x)\, \sin\!(\theta_{y,2}) & \cos\!(\theta_x) & - \cos\!(\theta_{y,2})\, \sin\!(\theta_x)\\  - \cos\!(\theta_{y,2})\, \sin\!(\theta_y) - \cos\!(\theta_x)\, \cos\!(\theta_y)\, \sin\!(\theta_{y,2}) & \cos\!(\theta_y)\, \sin\!(\theta_x) & \cos\!(\theta_x)\, \cos\!(\theta_y)\, \cos\!(\theta_{y,2}) - \sin\!(\theta_y)\, \sin\!(\theta_{y,2}) \end{array}\right]\\
+\\
+R_z R_x R_z = \\
+\left[\begin{array}{ccc} \cos\!(\theta_z)\, \cos\!(\theta_{z,2}) - \cos\!(\theta_x)\, \sin\!(\theta_z)\, \sin\!(\theta_{z,2}) &  - \cos\!(\theta_z)\, \sin\!(\theta_{z,2}) - \cos\!(\theta_x)\, \cos\!(\theta_{z,2})\, \sin\!(\theta_z) & \sin\!(\theta_x)\, \sin\!(\theta_z)\\ \cos\!(\theta_{z,2})\, \sin\!(\theta_z) + \cos\!(\theta_x)\, \cos\!(\theta_z)\, \sin\!(\theta_{z,2}) & \cos\!(\theta_x)\, \cos\!(\theta_z)\, \cos\!(\theta_{z,2}) - \sin\!(\theta_z)\, \sin\!(\theta_{z,2}) & - \cos\!(\theta_z)\, \sin\!(\theta_x)\\ \sin\!(\theta_x)\, \sin\!(\theta_{z,2}) & \cos\!(\theta_{z,2})\, \sin\!(\theta_x) & \cos\!(\theta_x) \end{array}\right]\\
+\\
+R_z R_y R_z = \\
+\left[\begin{array}{ccc} \cos\!(\theta_y)\, \cos\!(\theta_z)\, \cos\!(\theta_{z,2}) - \sin\!(\theta_z)\, \sin\!(\theta_{z,2}) &  - \cos\!(\theta_{z,2})\, \sin\!(\theta_z) - \cos\!(\theta_y)\, \cos\!(\theta_z)\, \sin\!(\theta_{z,2}) & \cos\!(\theta_z)\, \sin\!(\theta_y)\\ \cos\!(\theta_z)\, \sin\!(\theta_{z,2}) + \cos\!(\theta_y)\, \cos\!(\theta_{z,2})\, \sin\!(\theta_z) & \cos\!(\theta_z)\, \cos\!(\theta_{z,2}) - \cos\!(\theta_y)\, \sin\!(\theta_z)\, \sin\!(\theta_{z,2}) & \sin\!(\theta_y)\, \sin\!(\theta_z)\\ - \cos\!(\theta_{z,2})\, \sin\!(\theta_y) & \sin\!(\theta_y)\, \sin\!(\theta_{z,2}) & \cos\!(\theta_y) \end{array}\right]
+\end{gather*}
+
+\subsection{Fixed Frame Rotations}
+For rotations to be performed in the fixed frame (axes that are independent of the body), we will get the same rotation matrix as if the rotations were composed in reverse order in the body frame. So, $\leftidx{^\mathcal{F}}{R}{_{xyz}} = \leftidx{^\mathcal{B}}{R}{_{zyx}}$. Therefore, all of the rotation matrices listed above can be used, so long as the one corresponding to the reverse order of rotations is chosen.
+
+\clearpage
+\section{Matlab Code}
+\subsection{Transformation Testing Code}
+\lstinputlisting[language=Matlab]{GimbalTestTransforms.m}
+
+\subsection{Helper function for Visualizing Coordinate Frames}
+\lstinputlisting[language=Matlab]{plot_coords.m}
+
+\subsection{Helper function for Rotations from Axis-Angle Notation}
+\subsubsection{Matrix Representation}
+\lstinputlisting[language=Matlab]{rotmat.m}
+\subsubsection{Quaternion Representation}
+\lstinputlisting[language=Matlab]{rotq.m}
+\lstinputlisting[language=Matlab]{inv_q.m}
+
+\subsection{Helper function for Determining Motor Euler Angles (specific to gimbal geometry)}
+\subsubsection{Matrix Representation}
+\lstinputlisting[language=Matlab]{get_motor_angles.m}
+\subsubsection{Quaternion Representation}
+\lstinputlisting[language=Matlab]{get_motor_angles_q.m}
+
+\end{document}

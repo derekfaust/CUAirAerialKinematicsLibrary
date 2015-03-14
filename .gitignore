@@ -1,0 +1,32 @@
+# Mac Files to ignore
+.DS_Store
+
+# LaTeX Files to ignore
+*.aux
+*.glo
+*.idx
+*.log
+*.toc
+*.ist
+*.acn
+*.acr
+*.alg
+*.bbl
+*.blg
+*.dvi
+*.glg
+*.gls
+*.ilg
+*.ind
+*.lof
+*.lot
+*.maf
+*.mtc
+*.mtc1
+*.out
+*.synctex.gz
+
+# Matlab files to ignore
+*.asv
+*.m~
+*.mex*
