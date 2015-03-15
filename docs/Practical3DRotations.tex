@@ -91,9 +91,9 @@ For simplicity, I have included Appendix~\ref{sec:RotMatComp}, which includes sy
 \section{Applying Rotations}
 Before we begin mixing various rotations together, it if helpful to define a notation to keep things clear. The symbol $q$ will be used to represent quaternions, and $R$ will be used represent rotation matrices. We will put a script letter to the upper left which will specify the frame in which the rotation is defined, and we will use a subscript to the right which defines:
 \begin{align}
-\leftidx{\mathcal{^F}}{q}{_1} & \; \text{is the quaternion representing rotation 1 in the fixed frame} \\
-\leftidx{\mathcal{^B}}{q}{_2} & \; \text{is the quaternion representing rotation 2 in the body frame} \\
-\leftidx{\mathcal{^P}}{R}{_2} & \; \text{is the rotation matrix representing rotation 2 in the aircraft's frame}
+\leftidx{^\mathcal{F}}{q}{_1} & \; \text{is the quaternion representing rotation 1 in the fixed frame} \\
+\leftidx{^\mathcal{B}}{q}{_2} & \; \text{is the quaternion representing rotation 2 in the body frame} \\
+\leftidx{^\mathcal{A}}{R}{_2} & \; \text{is the rotation matrix representing rotation 2 in the aircraft's frame}
 \end{align}
 
 \subsection{Combining Rotations}
@@ -154,13 +154,13 @@ Here we explore the application of the concepts discussed above to a real proble
 The first part of this task is to determine an orientation of the camera---in the global frame, $\mathcal{F}$---such that it points toward the target GPS coordinate. If the desired orientation of the camera is simply straight-down, then a quaternion representing a $90^\circ$ rotation about the global y-axis---$\leftidx{^\mathcal{F}}{q}{_{D}} = 0 + 0\hat{\imath} + 1 \hat{\jmath} + 0 \hat{k}$---will suffice.
 
 \subsubsection{Determining Relative Position of the Target}
-To simplify the math, we will employ a North-East-Down coordinate frame located at the position of the aircraft. This reduces complication because all distances will be relative to the aircraft, yet all angles and rotations will be in the global frame (since this frame and the global frame have the same orientation).
+To simplify the math, we will employ a North-East-Down coordinate frame located at the position of the aircraft. This reduces complication because all distances will be relative to the aircraft, yet all angles and rotations will be in the global frame (since this frame and the global frame have the same orientation). We then use the aircraft's and target's latitude and longitude to find their relative positions.
 \begin{align}
 \Delta\mathrm{La} &= \mathrm{La}_\text{Target} - \mathrm{La}_\text{Aircraft} \\
 \Delta\mathrm{Lo} &= \mathrm{Lo}_\text{Target} - \mathrm{Lo}_\text{Aircraft} \\
 h_\text{AGL} &= h_\text{Aircraft} - h_\text{Ground} \\
 a &= \Delta\mathrm{La} \left(\dfrac{\pi}{180}\right) r_\text{Earth} \\
-b &= \Delta\mathrm{Lo} \left(\dfrac{\pi}{180}\right) \left(1-\cos\!\theta\right) r_\text{Earth}
+b &= \Delta\mathrm{Lo} \left(\dfrac{\pi}{180}\right) \left(1-\cos\!\left(\mathrm{La}_\text{Aircraft}\right)\right) r_\text{Earth}
 \end{align}
 
 \subsubsection{Form the Quaternion}
@@ -168,23 +168,26 @@ Given the relative position for us to point, we can form the quaternion that poi
 
 In this case, the simplest way to determine a quaternion pointing at the target is to find the axis along which the camera's line-of-sight moves directly toward the target. To do this, we select an axis perpendicular to this straight-line trajectory, then determine the angle or rotation from the tangent.
 \begin{equation*}
-\text{axis} = \left[\begin{array}{c} -b \\ a \\ 0 \end{array}\right] \quad \theta = \mathrm{atan2}\!\left(\sqrt{a^2+b^2}, \,h\right)
+\text{axis} = \left[\arraycolsep=1.4pt\def\arraystretch{2.2}\begin{array}{c} \dfrac{-b}{n} \\ \dfrac{a}{n} \\ 0 \end{array}\right], \: n=\sqrt{a^2 + b^2}, \quad \theta = \mathrm{atan2}\!\left(\sqrt{a^2+b^2}, \,h\right)
 \end{equation*}
 
 Using the axis-angle formulation, we can compose a quaternion that represents this rotation.
 \begin{gather}
-\leftidx{^\mathcal{F}}{q}{_{D}} = \dfrac{1}{n} \left[\arraycolsep=1.4pt\def\arraystretch{2.2}\begin{array}{c} \cos\!\left(\dfrac{\mathrm{atan2}\!\left(d,h\right)}{2}\right) \\ -b \sin\!\left(\dfrac{\mathrm{atan2}\!\left(d,h\right)}{2}\right) \\ a \sin\!\left(\dfrac{\mathrm{atan2}\!\left(d,h\right)}{2}\right) \\ 0\end{array} \right] = \left[\arraycolsep=1.4pt\def\arraystretch{2.2}\begin{array}{c} \dfrac{c}{n} \\ -\dfrac{bs}{n} \\ \dfrac{as}{n} \\ 0 \end{array}\right] \\ 
-\nonumber c= \cos\!\left(\dfrac{\theta}{2}\right) = \pm \sqrt{\dfrac{1+\cos\!\left(\theta \right)}{2}}, \quad s=\sin\!\left(\dfrac{\theta}{2}\right) = \pm \sqrt{\dfrac{1-\cos\!\left(\theta\right)}{2}}\\
-\nonumber m = \sqrt{a^2 + b^2 + h^2}, \quad n = \sqrt{c^2+b^2s^2+a^2s^2}
+\leftidx{^\mathcal{F}}{q}{_{D}} = \left[\arraycolsep=1.4pt\def\arraystretch{2.2}\begin{array}{c} \cos\!\left(\dfrac{\mathrm{atan2}\!\left(d,h\right)}{2}\right) \\ \dfrac{-b}{n} \sin\!\left(\dfrac{\mathrm{atan2}\!\left(d,h\right)}{2}\right) \\ \dfrac{a}{n} \sin\!\left(\dfrac{\mathrm{atan2}\!\left(d,h\right)}{2}\right) \\ 0\end{array} \right] = \left[\arraycolsep=1.4pt\def\arraystretch{2.2}\begin{array}{c} c \\ -\dfrac{bs}{n} \\ \dfrac{as}{n} \\ 0 \end{array}\right] \\ 
+c= \cos\!\left(\dfrac{\mathrm{atan2}\!\left(d,h\right)}{2}\right) = \pm \sqrt{\dfrac{1+\dfrac{h}{m}}{2}} \\
+s=\sin\!\left(\dfrac{\mathrm{atan2}\!\left(d,h\right)}{2}\right) = \pm \sqrt{\dfrac{1-\dfrac{h}{m}}{2}}\\
+m = \sqrt{a^2 + b^2 + h^2}
 \end{gather}
-An important thing to note is that we divide by $n$, the quaternion's magnitude, to normalize the quaternion before proceeding. We do this so that when we perform operations with other quaternions, they all remain of unit length and do not distort each other.
+An important thing to note is that we divide by $n$, the rotation axis' magnitude, to normalize the axis---and thus the quaternion---before proceeding. We do this so that when we perform operations with other quaternions, they all remain of unit length and do not distort each other.
 
-Also, because we often want to perform calculations like this on a microcontroller, we may want to convert some of the trigonometric calls---particularly find the inverse trigonometric function of another trigonometric functions---to simpler algebraic operations.
-\begin{gather*}
-\cos\!\left(\theta\right) = \dfrac{h}{\sqrt{d^2+h^2}} = \dfrac{h}{\sqrt{a^2+b^2+h^2}} \\
+Also, because we often want to perform calculations like this on a microcontroller, we converted some of the trigonometric calls---particularly finding the inverse trigonometric function of another trigonometric functions---to simpler algebraic operations. The algebra to do so 
+\begin{equation}
+\cos\!\left(\theta\right) = \dfrac{h}{\sqrt{d^2+h^2}} = \dfrac{h}{\sqrt{a^2+b^2+h^2}}
+\end{equation}
+\begin{gather}
 \cos\!\left(\theta\right) = \cos^2\!\left(\dfrac{\theta}{2}\right) - \sin^2\!\left(\dfrac{\theta}{2}\right)  = 1 - 2\sin^2\!\left(\dfrac{\theta}{2}\right) = 1\cos^2\!\left(\dfrac{\theta}{2}\right) - 1\\
 \sin\!\left(\dfrac{\theta}{2}\right) = \pm \sqrt{\dfrac{1-\cos\!\left(\theta\right)}{2}}, \quad \cos\!\left(\dfrac{\theta}{2}\right) = \pm \sqrt{\dfrac{1+\cos\!\left(\theta \right)}{2}}
-\end{gather*}
+\end{gather}
 
 \subsection{Finding Orientations Relative to the Aircraft}
 In the previous step, we have determined the desired camera quaternion in the fixed frame. From the Inertial Measurement Units on the aircraft and on the camera, we can also assume to have quaternions representing the aircraft's and camera's current orientations relative to the fixed frame.
@@ -208,15 +211,15 @@ Once these rotations are in the aircraft's frame, we can find the the motor angl
 
 By combining terms from this matrix, we can easily get the tangent of two of the angles, and the sine of the third. So long as $\cos\!\left(\theta_{y,\text{Pitch}}\right) \neq 0$, the Euler angles are simply:
 \begin{align*}
-\theta_y &= \mathrm{asin}\!\left(R_{1,3}\right) \\
-\theta_z &= \mathrm{atan2}\!\left(-R_{1,2}, \, R_{1,1}\right) \\
-\theta_x &= \mathrm{atan2}\!\left(-R_{2,3}, \, R_{3,3}\right)
+\theta_{x,\text{Pitch}} &= \mathrm{atan2}\!\left(-R_{2,3}, \, R_{3,3}\right) \\
+\theta_{y,\text{Roll}} &= \mathrm{asin}\!\left(R_{1,3}\right) \\
+\theta_{z,\text{Spin}} &= \mathrm{atan2}\!\left(-R_{1,2}, \, R_{1,1}\right)
 \end{align*}
 To find these terms of the rotation matrix, we employ Equation~\ref{eq:QtoMat} which will allow us to calculate the terms that we need to find the Euler angles.
 \begin{align}
-\theta_y &= \mathrm{asin}\!\left(R_{1,3}\right) = \mathrm{asin}\!\left(2\left(q_x q_z - q_w q_y\right)\right) \\
-\theta_z &= \mathrm{atan2}\!\left(-R_{1,2}, \, R_{1,1}\right) = \mathrm{atan2}\!\left(-2\left(q_x q_y - q_w q_z\right), \, q_w^2 +q_x^2 - q_y^2 - q_z^2\right) \\
-\theta_x &= \mathrm{atan2}\!\left(-R_{2,3}, \, R_{3,3}\right) = \mathrm{atan2}\!\left(-2\left(q_y q_z - q_w q_x\right), \, q_w^2 - q_x^2 - q_y^2 + q_z^2\right)
+\theta_{x,\text{Pitch}} &= \mathrm{atan2}\!\left(-R_{2,3}, \, R_{3,3}\right) = \mathrm{atan2}\!\left(-2\left(q_y q_z - q_w q_x\right), \, q_w^2 - q_x^2 - q_y^2 + q_z^2\right) \\
+\theta_{y,\text{Roll}} &= \mathrm{asin}\!\left(R_{1,3}\right) = \mathrm{asin}\!\left(2\left(q_x q_z - q_w q_y\right)\right) \\
+\theta_{z,\text{Spin}} &= \mathrm{atan2}\!\left(-R_{1,2}, \, R_{1,1}\right) = \mathrm{atan2}\!\left(-2\left(q_x q_y - q_w q_z\right), \, q_w^2 +q_x^2 - q_y^2 - q_z^2\right)
 \end{align}
 
 \paragraph{Special Cases}
@@ -224,17 +227,17 @@ In the case where $\cos\!\left(\theta_{y,\text{Pitch}}\right) = 0$, we cannot us
 \begin{align}
 \nonumber \text{For } & \sin\!\left(\theta_{y,\text{Pitch}}\right) = 1 \\
 R_{x,y,z} &= \left[\begin{array}{c c c} 0 & 0 & 1 \\ c_x s_z + c_z s_x & c_x c_z - s_x s_z & 0 \\ s_x s_z - c_x c_z & c_z s_x + c_x s_z & 0\end{array} \right] = \left[\begin{array}{c c c} 0 & 0 & 1 \\ \sin\!\left(\theta_x + \theta_z\right) & \cos\!\left(\theta_x + \theta_z\right) & 0 \\ -\cos\!\left(\theta_x + \theta_z\right) & \sin\!\left(\theta_x + \theta_z\right) & 0\end{array} \right] \\
-\theta_y &= \dfrac{\pi}{2} \\
-\theta_x &= 0 \\
-\theta_z &= \mathrm{atan2}\!\left(R_{2,1}, \, R_{2,2}\right) = \mathrm{atan2}\!\left(2\left(q_x q_y + q_w q_z\right), \, q_w^2 - q_x^2 + q_y^2 - q_z^2 \right)
+\theta_{y,\text{Pitch}} &= \dfrac{\pi}{2} \\
+\theta_{x,\text{Roll}} &= 0 \\
+\theta_{z,\text{Spin}} &= \mathrm{atan2}\!\left(R_{2,1}, \, R_{2,2}\right) = \mathrm{atan2}\!\left(2\left(q_x q_y + q_w q_z\right), \, q_w^2 - q_x^2 + q_y^2 - q_z^2 \right)
 \end{align}
 
 \begin{align}
 \nonumber \text{For } & \sin\!\left(\theta_{y,\text{Pitch}}\right) = -1 \\
 R_{x,y,z} &= \left[\begin{array}{c c c} 0 & 0 & 1 \\ c_x s_z - c_z s_x & c_x c_z + s_x s_z & 0 \\ s_x s_z + c_x c_z & c_z s_x - c_x s_z & 0\end{array} \right] = \left[\begin{array}{c c c} 0 & 0 & 1 \\ \sin\!\left(\theta_z - \theta_x\right) & \cos\!\left(\theta_z - \theta_x\right) & 0\\ \cos\!\left(\theta_z - \theta_z\right) & -\sin\!\left(\theta_z - \theta_x\right) & 0\end{array} \right] \\
-\theta_y &= -\dfrac{\pi}{2} \\
-\theta_x &= 0 \\
-\theta_z &= \mathrm{atan2}\!\left(R_{2,1}, \, R_{2,2}\right) = \mathrm{atan2}\!\left(2\left(q_x q_y + q_w q_z\right), \, q_w^2 - q_x^2 + q_y^2 - q_z^2 \right) \\
+\theta_{y,\text{Pitch}} &= -\dfrac{\pi}{2} \\
+\theta_{x,\text{Roll}} &= 0 \\
+\theta_{z,\text{Spin}} &= \mathrm{atan2}\!\left(R_{2,1}, \, R_{2,2}\right) = \mathrm{atan2}\!\left(2\left(q_x q_y + q_w q_z\right), \, q_w^2 - q_x^2 + q_y^2 - q_z^2 \right) \\
 \end{align}
 
 In both of the cases shown above, when $\cos\!\left(\theta_{y,\text{Pitch}}\right) = 0$, then the matrix shows that $\theta_{x,\text{Roll}}$ and $\theta_{z,\text{Spin}}$ effectively operate about the same axis. There are infinitely many solutions to this problem because only one variable is required to span the space. In this case, we can choose any arbitrary value for one of the angles, then calculate the value of the other that satisfies the constraints. For this particular situation, I chose $\theta_{x,\text{Roll}} = 0$ because we cannot actuate about the z-axis, so we never need to actually perform the more complex calculation.
